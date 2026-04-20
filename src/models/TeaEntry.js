@@ -31,7 +31,7 @@ const teaEntrySchema = new mongoose.Schema(
     price_per_cup: {
       type: Number,
       required: true,
-      min: [1, "Price must be greater than 0"], // ✅ FIX
+      min: [1, "Price must be greater than 0"],
     },
 
     total: {

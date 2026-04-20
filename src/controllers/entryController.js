@@ -91,6 +91,9 @@ const getMonthlyEntries = async (req, res) => {
 
     month = parseInt(month);
     year = parseInt(year);
+    const priceDoc = await TeaPrice.findOne().sort({ effective_from: -1 });
+
+    const currentPrice = priceDoc.price_per_cup;
 
     const entries = await TeaEntry.find({ month, year }).sort({
       date_time: 1,
@@ -109,6 +112,7 @@ const getMonthlyEntries = async (req, res) => {
       month,
       year,
       totalCups,
+      currentPrice,
       totalAmount,
       totalEntries: entries.length,
       entries,
@@ -191,7 +195,6 @@ const exportMonthlySummary = async (req, res) => {
   try {
     let { month, year } = req.query;
 
-    // ✅ Validate input FIRST
     if (!month || !year) {
       return res.status(400).json({
         message: "Month and year are required",
@@ -201,7 +204,6 @@ const exportMonthlySummary = async (req, res) => {
     month = parseInt(month);
     year = parseInt(year);
 
-    // ✅ Check NaN
     if (isNaN(month) || isNaN(year)) {
       return res.status(400).json({
         message: "Invalid month or year",
@@ -305,14 +307,21 @@ const exportMonthlyPDF = async (req, res) => {
 
     let totalCups = 0;
     let totalAmount = 0;
+    let pricePerCup = 0;
 
     entries.forEach((e) => {
       const price = e.price_per_cup || 0;
+      pricePerCup = price; // assume same price for report
       totalCups += e.cup_count;
       totalAmount += e.cup_count * price;
     });
 
-    const doc = new PDFDocument({ margin: 40 });
+    // Convert month number → name
+    const monthName = new Date(year, month - 1).toLocaleString("en-IN", {
+      month: "long",
+    });
+
+    const doc = new PDFDocument({ margin: 50 });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
@@ -322,44 +331,54 @@ const exportMonthlyPDF = async (req, res) => {
 
     doc.pipe(res);
 
-    doc.fontSize(18).text("Tea Counter Report", { align: "center" });
+    // ================= HEADER =================
+    doc
+      .fontSize(22)
+      .fillColor("#6B3F1D") // brown
+      .text("Tea Counter Report");
+
     doc.moveDown();
 
-    doc.text(`Month: ${month}/${year}`);
+    doc.fillColor("black").fontSize(12);
+
+    doc.text(`Month: ${monthName} ${year}`);
+    doc.moveDown(0.5);
     doc.text(`Total Cups: ${totalCups}`);
-    doc.text(`Total Entries: ${entries.length}`);
-    doc.text(`Total Amount: ${totalAmount}`);
+    doc.moveDown(0.5);
+    doc.text(`Price per Cup: ${pricePerCup}`);
+    doc.moveDown(0.5);
 
-    doc.moveDown();
-    // doc.text("---------------------------------------------");
+    doc
+      .fontSize(14)
+      .fillColor("#0E9F6E") // green
+      .text(`Total Amount: ${totalAmount}`);
 
-    const tableTop = 200;
+    doc.moveDown(2);
 
-    doc.font("Helvetica-Bold");
-    doc.text("Date", 50, tableTop);
-    doc.text("Time", 180, tableTop);
-    doc.text("Cups", 300, tableTop);
-    doc.text("Price", 380, tableTop);
-    doc.text("Total", 460, tableTop);
+    // ================= TABLE HEADER =================
+    const tableTop = doc.y;
 
-    doc.font("Helvetica");
+    doc.fillColor("#6B3F1D").font("Helvetica-Bold");
 
+    doc.text("DATE", 50, tableTop);
+    doc.text("TIME", 250, tableTop);
+    doc.text("CUPS", 450, tableTop);
+
+    // line under header
     doc
       .moveTo(50, tableTop + 15)
       .lineTo(550, tableTop + 15)
       .stroke();
 
-    let y = tableTop + 30;
+    doc.font("Helvetica").fillColor("black");
 
+    let y = tableTop + 25;
+
+    // ================= TABLE ROWS =================
     entries.forEach((e) => {
-      const price = e.price_per_cup || 0;
-      const rowTotal = e.cup_count * price;
-
       doc.text(e.date, 50, y);
-      doc.text(e.time, 180, y);
-      doc.text(String(e.cup_count), 300, y);
-      doc.text(String(price), 380, y);
-      doc.text(String(rowTotal), 460, y);
+      doc.text(e.time, 250, y);
+      doc.text(String(e.cup_count), 450, y);
 
       y += 20;
 
@@ -368,16 +387,6 @@ const exportMonthlyPDF = async (req, res) => {
         y = 50;
       }
     });
-
-    y += 20;
-
-    doc.moveTo(50, y).lineTo(550, y).stroke();
-
-    y += 15;
-
-    doc.font("Helvetica-Bold");
-    doc.text("Grand Total:", 350, y);
-    doc.text(`${totalAmount}`, 460, y);
 
     doc.end();
   } catch (error) {

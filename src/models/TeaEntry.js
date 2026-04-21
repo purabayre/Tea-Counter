@@ -5,11 +5,10 @@ const teaEntrySchema = new mongoose.Schema(
     date_time: {
       type: Date,
       required: true,
-      default: Date.now,
     },
 
     date: {
-      type: String,
+      type: Date,
       required: true,
     },
 
@@ -38,15 +37,12 @@ const teaEntrySchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-
     month: {
       type: Number,
-      required: true,
     },
 
     year: {
       type: Number,
-      required: true,
     },
   },
   {

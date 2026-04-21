@@ -1,8 +1,5 @@
 const TeaPrice = require("../models/TeaPrice");
 
-// ==============================
-// GET PRICE FOR MONTH
-// ==============================
 const getPriceForMonth = async (month, year) => {
   const monthStart = new Date(year, month - 1, 1);
 
@@ -13,9 +10,6 @@ const getPriceForMonth = async (month, year) => {
   return priceDoc ? priceDoc.price : 0;
 };
 
-// ==============================
-// CALCULATE BILLING
-// ==============================
 const calculateBilling = (entries, pricePerCup) => {
   const totalCups = entries.reduce((sum, e) => sum + e.cup_count, 0);
 

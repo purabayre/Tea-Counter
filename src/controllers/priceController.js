@@ -1,6 +1,5 @@
 const TeaPrice = require("../models/TeaPrice");
 
-// @desc    Set new price
 const setPrice = async (req, res) => {
   try {
     const { price } = req.body;
@@ -12,7 +11,7 @@ const setPrice = async (req, res) => {
     }
 
     const newPrice = new TeaPrice({
-      price_per_cup: price, // ✅ FIXED
+      price_per_cup: price,
       effective_from: new Date(),
     });
 
@@ -28,7 +27,6 @@ const setPrice = async (req, res) => {
   }
 };
 
-// @desc Get current price
 const getCurrentPrice = async (req, res) => {
   try {
     const priceDoc = await TeaPrice.findOne().sort({
@@ -42,7 +40,7 @@ const getCurrentPrice = async (req, res) => {
     }
 
     res.status(200).json({
-      price: priceDoc.price_per_cup, // ✅ FIXED
+      price: priceDoc.price_per_cup,
       effective_from: priceDoc.effective_from,
     });
   } catch (error) {

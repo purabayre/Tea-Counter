@@ -1,7 +1,6 @@
 const getDateTimeDetails = () => {
   const now = new Date();
 
-  // Format Date → 14-Apr-2026
   const day = String(now.getDate()).padStart(2, "0");
 
   const months = [
@@ -25,7 +24,6 @@ const getDateTimeDetails = () => {
 
   const formattedDate = `${day}-${monthName}-${year}`;
 
-  // Format Time → 10:35 AM
   let hours = now.getHours();
   const minutes = String(now.getMinutes()).padStart(2, "0");
 

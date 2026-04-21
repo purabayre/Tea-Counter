@@ -4,12 +4,9 @@ const { getDateTimeDetails } = require("../utils/dateHelper");
 const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 
-// ==============================
-// ADD ENTRY
-// ==============================
 const addEntry = async (req, res) => {
   try {
-    const { cup_count } = req.body;
+    const { cup_count, date } = req.body;
 
     if (!cup_count || !Number.isInteger(cup_count) || cup_count <= 0) {
       return res.status(400).json({
@@ -17,7 +14,22 @@ const addEntry = async (req, res) => {
       });
     }
 
-    const { date_time, date, time, month, year } = getDateTimeDetails();
+    if (!date) {
+      return res.status(400).json({
+        message: "Date is required",
+      });
+    }
+
+    const manualDate = new Date(date);
+
+    if (isNaN(manualDate.getTime())) {
+      return res.status(400).json({
+        message: "Invalid date format",
+      });
+    }
+
+    const now = new Date();
+    const time = now.toLocaleTimeString("en-IN");
 
     const priceDoc = await TeaPrice.findOne().sort({ effective_from: -1 });
 
@@ -32,11 +44,13 @@ const addEntry = async (req, res) => {
       cup_count,
       price_per_cup: currentPrice,
       total,
-      date_time,
-      date,
+
+      date_time: manualDate,
+      date: manualDate,
       time,
-      month,
-      year,
+
+      month: manualDate.getMonth() + 1,
+      year: manualDate.getFullYear(),
     });
 
     const saved = await newEntry.save();
@@ -78,9 +92,6 @@ const getTodayEntries = async (req, res) => {
   }
 };
 
-// ==============================
-// MONTHLY ENTRIES
-// ==============================
 const getMonthlyEntries = async (req, res) => {
   try {
     let { month, year } = req.query;
@@ -123,9 +134,6 @@ const getMonthlyEntries = async (req, res) => {
   }
 };
 
-// ==============================
-// UPDATE ENTRY
-// ==============================
 const updateEntry = async (req, res) => {
   try {
     const { id } = req.params;
@@ -161,9 +169,6 @@ const updateEntry = async (req, res) => {
   }
 };
 
-// ==============================
-// DELETE ENTRY
-// ==============================
 const deleteEntry = async (req, res) => {
   try {
     const { id } = req.params;
@@ -188,9 +193,6 @@ const deleteEntry = async (req, res) => {
   }
 };
 
-// ==============================
-// EXCEL SUMMARY EXPORT
-// ==============================
 const exportMonthlySummary = async (req, res) => {
   try {
     let { month, year } = req.query;
@@ -248,9 +250,6 @@ const exportMonthlySummary = async (req, res) => {
   }
 };
 
-// ==============================
-// EXCEL ENTRIES EXPORT
-// ==============================
 const exportMonthlyEntries = async (req, res) => {
   try {
     let { month, year } = req.query;
@@ -291,9 +290,6 @@ const exportMonthlyEntries = async (req, res) => {
   }
 };
 
-// ==============================
-// PDF EXPORT
-// ==============================
 const exportMonthlyPDF = async (req, res) => {
   try {
     let { month, year } = req.query;

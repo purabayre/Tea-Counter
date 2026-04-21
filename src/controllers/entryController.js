@@ -67,21 +67,50 @@ const addEntry = async (req, res) => {
 
 const getTodayEntries = async (req, res) => {
   try {
-    const { date } = getDateTimeDetails();
+    const now = new Date();
 
-    const entries = await TeaEntry.find({ date }).sort({ date_time: 1 });
+    // Start of today (IST-safe)
+    const start = new Date(
+      Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0),
+    );
+
+    // End of today (IST-safe)
+    const end = new Date(
+      Date.UTC(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        23,
+        59,
+        59,
+        999,
+      ),
+    );
+
+    const entries = await TeaEntry.find({
+      date_time: {
+        $gte: start,
+        $lte: end,
+      },
+    }).sort({ date_time: 1 });
 
     let totalCups = 0;
     let totalAmount = 0;
 
     entries.forEach((e) => {
       const price = e.price_per_cup || 0;
-      totalCups += e.cup_count;
-      totalAmount += e.cup_count * price;
+      totalCups += e.cup_count || 0;
+      totalAmount += (e.cup_count || 0) * price;
     });
 
     res.json({
-      date,
+      date: now
+        .toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+        .replace(/ /g, "-"), // 21-Apr-2026
       totalCups,
       totalAmount,
       totalEntries: entries.length,
@@ -91,7 +120,6 @@ const getTodayEntries = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 const getMonthlyEntries = async (req, res) => {
   try {
     let { month, year } = req.query;
@@ -102,9 +130,10 @@ const getMonthlyEntries = async (req, res) => {
 
     month = parseInt(month);
     year = parseInt(year);
+
     const priceDoc = await TeaPrice.findOne().sort({ effective_from: -1 });
 
-    const currentPrice = priceDoc.price_per_cup;
+    const currentPrice = priceDoc ? priceDoc.price_per_cup : 0;
 
     const entries = await TeaEntry.find({ month, year }).sort({
       date_time: 1,
@@ -114,9 +143,8 @@ const getMonthlyEntries = async (req, res) => {
     let totalAmount = 0;
 
     entries.forEach((e) => {
-      const price = e.price_per_cup || 0;
       totalCups += e.cup_count;
-      totalAmount += e.cup_count * price;
+      totalAmount += e.cup_count * currentPrice;
     });
 
     res.json({
@@ -133,7 +161,6 @@ const getMonthlyEntries = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 const updateEntry = async (req, res) => {
   try {
     const { id } = req.params;
@@ -254,12 +281,30 @@ const exportMonthlyEntries = async (req, res) => {
   try {
     let { month, year } = req.query;
 
-    month = parseInt(month);
-    year = parseInt(year);
+    month = Number(month);
+    year = Number(year);
 
-    const entries = await TeaEntry.find({ month, year }).sort({
-      date_time: 1,
-    });
+    // ✅ Validation
+    if (
+      !month ||
+      !year ||
+      isNaN(month) ||
+      isNaN(year) ||
+      month < 1 ||
+      month > 12
+    ) {
+      return res.status(400).json({
+        message: "Valid month (1-12) and year required",
+      });
+    }
+
+    // ✅ Month date range
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const entries = await TeaEntry.find({
+      date_time: { $gte: start, $lte: end },
+    }).sort({ date_time: 1 });
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Entries");
@@ -268,9 +313,10 @@ const exportMonthlyEntries = async (req, res) => {
 
     entries.forEach((e) => {
       const price = e.price_per_cup || 0;
-      const total = e.cup_count * price;
+      const cups = e.cup_count || 0;
+      const total = cups * price;
 
-      sheet.addRow([e.date, e.time, e.cup_count, price, total]);
+      sheet.addRow([e.date || "-", e.time || "-", cups, price, total]);
     });
 
     res.setHeader(
@@ -286,6 +332,7 @@ const exportMonthlyEntries = async (req, res) => {
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
+    console.error("Excel Export Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -294,12 +341,30 @@ const exportMonthlyPDF = async (req, res) => {
   try {
     let { month, year } = req.query;
 
-    month = parseInt(month);
-    year = parseInt(year);
+    month = Number(month);
+    year = Number(year);
 
-    const entries = await TeaEntry.find({ month, year }).sort({
-      date_time: 1,
-    });
+    // ✅ Validation
+    if (
+      !month ||
+      !year ||
+      isNaN(month) ||
+      isNaN(year) ||
+      month < 1 ||
+      month > 12
+    ) {
+      return res.status(400).json({
+        message: "Valid month (1-12) and year required",
+      });
+    }
+
+    // ✅ Month date range
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const entries = await TeaEntry.find({
+      date_time: { $gte: start, $lte: end },
+    }).sort({ date_time: 1 });
 
     let totalCups = 0;
     let totalAmount = 0;
@@ -307,12 +372,13 @@ const exportMonthlyPDF = async (req, res) => {
 
     entries.forEach((e) => {
       const price = e.price_per_cup || 0;
-      pricePerCup = price; // assume same price for report
-      totalCups += e.cup_count;
-      totalAmount += e.cup_count * price;
+      const cups = e.cup_count || 0;
+
+      pricePerCup = price;
+      totalCups += cups;
+      totalAmount += cups * price;
     });
 
-    // Convert month number → name
     const monthName = new Date(year, month - 1).toLocaleString("en-IN", {
       month: "long",
     });
@@ -327,11 +393,7 @@ const exportMonthlyPDF = async (req, res) => {
 
     doc.pipe(res);
 
-    // ================= HEADER =================
-    doc
-      .fontSize(22)
-      .fillColor("#6B3F1D") // brown
-      .text("Tea Counter Report");
+    doc.fontSize(22).fillColor("#6B3F1D").text("Tea Counter Report");
 
     doc.moveDown();
 
@@ -344,14 +406,10 @@ const exportMonthlyPDF = async (req, res) => {
     doc.text(`Price per Cup: ${pricePerCup}`);
     doc.moveDown(0.5);
 
-    doc
-      .fontSize(14)
-      .fillColor("#0E9F6E") // green
-      .text(`Total Amount: ${totalAmount}`);
+    doc.fontSize(14).fillColor("#0E9F6E").text(`Total Amount: ${totalAmount}`);
 
     doc.moveDown(2);
 
-    // ================= TABLE HEADER =================
     const tableTop = doc.y;
 
     doc.fillColor("#6B3F1D").font("Helvetica-Bold");
@@ -360,7 +418,6 @@ const exportMonthlyPDF = async (req, res) => {
     doc.text("TIME", 250, tableTop);
     doc.text("CUPS", 450, tableTop);
 
-    // line under header
     doc
       .moveTo(50, tableTop + 15)
       .lineTo(550, tableTop + 15)
@@ -370,11 +427,30 @@ const exportMonthlyPDF = async (req, res) => {
 
     let y = tableTop + 25;
 
-    // ================= TABLE ROWS =================
     entries.forEach((e) => {
-      doc.text(e.date, 50, y);
-      doc.text(e.time, 250, y);
-      doc.text(String(e.cup_count), 450, y);
+      const dateObj = new Date(e.date_time);
+
+      // ✅ Format: 20-Apr-2026
+      const formattedDate = dateObj
+        .toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+        .replace(/ /g, "-");
+
+      // ✅ Format: 05:49 pm
+      const formattedTime = dateObj
+        .toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+        .toLowerCase();
+
+      doc.text(formattedDate, 50, y);
+      doc.text(formattedTime, 250, y);
+      doc.text(String(e.cup_count || 0), 450, y);
 
       y += 20;
 

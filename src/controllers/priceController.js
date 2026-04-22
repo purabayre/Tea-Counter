@@ -1,10 +1,11 @@
 const TeaPrice = require("../models/TeaPrice");
 
+// ✅ Set New Price
 const setPrice = async (req, res) => {
   try {
     const { price } = req.body;
 
-    if (!price || price <= 0) {
+    if (!price || isNaN(price) || price <= 0) {
       return res.status(400).json({
         message: "Valid price is required",
       });
@@ -27,6 +28,7 @@ const setPrice = async (req, res) => {
   }
 };
 
+// ✅ Get Current Price (Latest)
 const getCurrentPrice = async (req, res) => {
   try {
     const priceDoc = await TeaPrice.findOne().sort({
@@ -49,7 +51,45 @@ const getCurrentPrice = async (req, res) => {
   }
 };
 
+// ✅ Get Full Price History (with optional pagination)
+const getPriceHistory = async (req, res) => {
+  try {
+    let { page = 1, limit = 50 } = req.query;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    const skip = (page - 1) * limit;
+
+    const history = await TeaPrice.find()
+      .sort({ effective_from: -1 }) // latest first
+      .skip(skip)
+      .limit(limit);
+
+    const total = await TeaPrice.countDocuments();
+
+    if (!history.length) {
+      return res.status(404).json({
+        message: "No price history found",
+      });
+    }
+
+    res.status(200).json({
+      total,
+      page,
+      limit,
+      history,
+    });
+  } catch (error) {
+    console.error("Error fetching price history:", error);
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
+
 module.exports = {
   setPrice,
   getCurrentPrice,
+  getPriceHistory,
 };

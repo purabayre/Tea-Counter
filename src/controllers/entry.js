@@ -378,7 +378,12 @@ const exportMonthlyPDF = async (req, res) => {
 
     doc.pipe(res);
 
-    doc.fontSize(22).fillColor("#6B3F1D").text("Tea Counter Report");
+    doc
+      .fontSize(22)
+      .fillColor("#6B3F1D")
+      .text(`Tea Counter Report (${monthName}, ${year})`, {
+        align: "center",
+      });
 
     doc.moveDown();
 
@@ -388,7 +393,7 @@ const exportMonthlyPDF = async (req, res) => {
     doc.moveDown(0.5);
     doc.text(`Total Cups: ${totalCups}`);
     doc.moveDown(0.5);
-    doc.text(`Price per Cup: ${pricePerCup}`);
+    doc.text(`Current Cup Price: ${pricePerCup}`);
     doc.moveDown(0.5);
 
     doc.fontSize(14).fillColor("#0E9F6E").text(`Total Amount: ${totalAmount}`);
@@ -399,12 +404,15 @@ const exportMonthlyPDF = async (req, res) => {
 
     doc.fillColor("#6B3F1D").font("Helvetica-Bold");
 
-    doc.text("DATE", 50, tableTop);
-    doc.text("TIME", 250, tableTop);
-    doc.text("CUPS", 450, tableTop);
+    doc.text("#", 30, tableTop);
+    doc.text("DATE", 70, tableTop);
+    doc.text("TIME", 150, tableTop);
+    doc.text("PER CUP", 250, tableTop);
+    doc.text("CUPS", 350, tableTop);
+    doc.text("TOTAL", 430, tableTop);
 
     doc
-      .moveTo(50, tableTop + 15)
+      .moveTo(30, tableTop + 15)
       .lineTo(550, tableTop + 15)
       .stroke();
 
@@ -412,10 +420,9 @@ const exportMonthlyPDF = async (req, res) => {
 
     let y = tableTop + 25;
 
-    entries.forEach((e) => {
+    entries.forEach((e, index) => {
       const dateObj = new Date(e.date_time);
 
-      // ✅ DATE (same)
       const formattedDate = dateObj
         .toLocaleDateString("en-GB", {
           day: "2-digit",
@@ -424,12 +431,18 @@ const exportMonthlyPDF = async (req, res) => {
         })
         .replace(/ /g, "-");
 
-      // ✅ FIX: Use stored time instead of recalculating
       const formattedTime = e.time || "-";
 
+      const cups = e.cup_count || 0;
+      const price = e.price_per_cup || 0;
+      const total = cups * price;
+
+      doc.text(String(index + 1), 30, y);
       doc.text(formattedDate, 50, y);
-      doc.text(formattedTime, 250, y);
-      doc.text(String(e.cup_count || 0), 450, y);
+      doc.text(formattedTime, 140, y);
+      doc.text(`${price}`, 270, y);
+      doc.text(String(cups), 360, y);
+      doc.text(`${total}`, 445, y);
 
       y += 20;
 
@@ -437,6 +450,11 @@ const exportMonthlyPDF = async (req, res) => {
         doc.addPage();
         y = 50;
       }
+    });
+
+    doc.moveDown(2);
+    doc.fontSize(14).fillColor("#0E9F6E").text(`Total Amount: ${totalAmount}`, {
+      align: "right",
     });
 
     doc.end();
@@ -451,7 +469,7 @@ module.exports = {
   getMonthlyEntries,
   updateEntry,
   deleteEntry,
-  //   exportMonthlySummary,
+  //   exportMonthlySummary
   //   exportMonthlyEntries,
   exportMonthlyPDF,
 };

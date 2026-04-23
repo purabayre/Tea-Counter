@@ -1,6 +1,5 @@
 const TeaPrice = require("../models/TeaPrice");
 
-// ✅ Set New Price
 const setPrice = async (req, res) => {
   try {
     const { price } = req.body;
@@ -28,7 +27,6 @@ const setPrice = async (req, res) => {
   }
 };
 
-// ✅ Get Current Price (Latest)
 const getCurrentPrice = async (req, res) => {
   try {
     const priceDoc = await TeaPrice.findOne().sort({
@@ -51,10 +49,9 @@ const getCurrentPrice = async (req, res) => {
   }
 };
 
-// ✅ Get Full Price History (with optional pagination)
 const getPriceHistory = async (req, res) => {
   try {
-    let { page = 1, limit = 50 } = req.query;
+    let { page = 1, limit = 5 } = req.query;
 
     page = parseInt(page);
     limit = parseInt(limit);
@@ -62,7 +59,7 @@ const getPriceHistory = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const history = await TeaPrice.find()
-      .sort({ effective_from: -1 }) // latest first
+      .sort({ effective_from: -1 })
       .skip(skip)
       .limit(limit);
 
@@ -70,14 +67,14 @@ const getPriceHistory = async (req, res) => {
 
     if (!history.length) {
       return res.status(404).json({
-        message: "No price history found",
+        message: "Price history not found",
       });
     }
 
     res.status(200).json({
-      total,
-      page,
-      limit,
+      // total,
+      // page,
+      // limit,
       history,
     });
   } catch (error) {

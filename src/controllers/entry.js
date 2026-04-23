@@ -405,11 +405,11 @@ const exportMonthlyPDF = async (req, res) => {
     doc.fillColor("#6B3F1D").font("Helvetica-Bold");
 
     doc.text("#", 30, tableTop);
-    doc.text("DATE", 70, tableTop);
-    doc.text("TIME", 150, tableTop);
+    doc.text("DATE", 80, tableTop);
+    doc.text("TIME", 175, tableTop);
     doc.text("PER CUP", 250, tableTop);
     doc.text("CUPS", 350, tableTop);
-    doc.text("TOTAL", 430, tableTop);
+    doc.text("TOTAL", 435, tableTop);
 
     doc
       .moveTo(30, tableTop + 15)
@@ -431,18 +431,21 @@ const exportMonthlyPDF = async (req, res) => {
         })
         .replace(/ /g, "-");
 
-      const formattedTime = e.time || "-";
+      // ✅ FIX: use stored time instead of recalculating
+      const formattedTime = e.time
+        ? e.time.split(":").slice(0, 2).join(":") + " " + e.time.split(" ")[1]
+        : "-";
 
       const cups = e.cup_count || 0;
       const price = e.price_per_cup || 0;
       const total = cups * price;
 
       doc.text(String(index + 1), 30, y);
-      doc.text(formattedDate, 50, y);
-      doc.text(formattedTime, 140, y);
+      doc.text(formattedDate, 60, y);
+      doc.text(formattedTime, 170, y);
       doc.text(`${price}`, 270, y);
       doc.text(String(cups), 360, y);
-      doc.text(`${total}`, 445, y);
+      doc.text(`${total}`, 450, y);
 
       y += 20;
 
@@ -452,10 +455,16 @@ const exportMonthlyPDF = async (req, res) => {
       }
     });
 
-    doc.moveDown(2);
-    doc.fontSize(14).fillColor("#0E9F6E").text(`Total Amount: ${totalAmount}`, {
-      align: "right",
-    });
+    y += 10;
+
+    doc.moveTo(25, y).lineTo(550, y).stroke();
+
+    y += 8;
+
+    doc
+      .fontSize(13)
+      .fillColor("#0E9F6E")
+      .text(`Total Amount: ${totalAmount}`, 360, y);
 
     doc.end();
   } catch (error) {

@@ -18,8 +18,6 @@ router.get("/today", getTodayEntries);
 router.get("/month", getMonthlyEntries);
 router.put("/update/:id", updateEntry);
 router.delete("/delete/:id", deleteEntry);
-// router.get("/export/summary", exportMonthlySummary);
-// router.get("/export/entries", exportMonthlyEntries);
 router.get("/export/pdf", exportMonthlyPDF);
 
 module.exports = router;

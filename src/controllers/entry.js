@@ -1,7 +1,7 @@
 const TeaEntry = require("../models/TeaEntry");
 const TeaPrice = require("../models/TeaPrice");
 const ExcelJS = require("exceljs");
-const PDFDocument = require("pdfkit");
+const PDFDocument = require("pdfkit-table");
 
 const getCurrentMonthYear = () => {
   const now = new Date();
@@ -231,98 +231,6 @@ const deleteEntry = async (req, res) => {
   }
 };
 
-//  EXCEL SUMMARY
-// const exportMonthlySummary = async (req, res) => {
-//   try {
-//     let { month, year } = req.query;
-
-//     if (!month || !year) {
-//       return res.status(400).json({
-//         message: "Month and year are required",
-//       });
-//     }
-
-//     month = parseInt(month);
-//     year = parseInt(year);
-
-//     const entries = await TeaEntry.find({ month, year });
-
-//     let totalCups = 0;
-//     let totalAmount = 0;
-
-//     entries.forEach((e) => {
-//       totalCups += e.cup_count;
-//       totalAmount += e.cup_count * (e.price_per_cup || 0);
-//     });
-
-//     const workbook = new ExcelJS.Workbook();
-//     const sheet = workbook.addWorksheet("Summary");
-
-//     sheet.addRow([`Tea Summary - ${month}/${year}`]);
-//     sheet.addRow([]);
-//     sheet.addRow(["Total Cups", totalCups]);
-//     sheet.addRow(["Total Entries", entries.length]);
-//     sheet.addRow(["Total Amount", totalAmount]);
-
-//     res.setHeader(
-//       "Content-Type",
-//       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-//     );
-//     res.setHeader(
-//       "Content-Disposition",
-//       `attachment; filename=tea-summary-${month}-${year}.xlsx`,
-//     );
-
-//     await workbook.xlsx.write(res);
-//     res.end();
-//   } catch (error) {
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
-
-// EXCEL ENTRIES
-// const exportMonthlyEntries = async (req, res) => {
-//   try {
-//     let { month, year } = req.query;
-
-//     month = Number(month);
-//     year = Number(year);
-
-//     const start = new Date(year, month - 1, 1);
-//     const end = new Date(year, month, 0, 23, 59, 59, 999);
-
-//     const entries = await TeaEntry.find({
-//       date_time: { $gte: start, $lte: end },
-//     }).sort({ date_time: 1 });
-
-//     const workbook = new ExcelJS.Workbook();
-//     const sheet = workbook.addWorksheet("Entries");
-
-//     sheet.addRow(["Date", "Time", "Cups", "Price", "Total"]);
-
-//     entries.forEach((e) => {
-//       const price = e.price_per_cup || 0;
-//       const cups = e.cup_count || 0;
-
-//       sheet.addRow([e.date || "-", e.time || "-", cups, price, cups * price]);
-//     });
-
-//     res.setHeader(
-//       "Content-Type",
-//       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-//     );
-//     res.setHeader(
-//       "Content-Disposition",
-//       `attachment; filename=tea-entries-${month}-${year}.xlsx`,
-//     );
-
-//     await workbook.xlsx.write(res);
-//     res.end();
-//   } catch (error) {
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
-
 //  PDF
 const exportMonthlyPDF = async (req, res) => {
   try {
@@ -400,7 +308,6 @@ const exportMonthlyPDF = async (req, res) => {
 
     doc.moveDown(2);
 
-    // Table Header
     const tableTop = doc.y;
 
     const col = {
@@ -419,9 +326,8 @@ const exportMonthlyPDF = async (req, res) => {
     doc.text("TIME", col.time, tableTop);
     doc.text("PER CUP", col.price, tableTop);
     doc.text("CUPS", col.cups, tableTop);
-    doc.text("TOTAL", col.total, tableTop);
+    doc.text("TOTAL", col.total + 15, tableTop);
 
-    // Header line
     doc
       .moveTo(30, tableTop + 15)
       .lineTo(550, tableTop + 15)
@@ -431,7 +337,6 @@ const exportMonthlyPDF = async (req, res) => {
 
     let y = tableTop + 25;
 
-    // Table Rows
     entries.forEach((e, index) => {
       const dateObj = new Date(e.date_time);
 
@@ -456,15 +361,16 @@ const exportMonthlyPDF = async (req, res) => {
       doc.text(formattedTime, col.time - 5, y);
       doc.text(`${price}`, col.price + 20, y);
       doc.text(String(cups), col.cups + 10, y);
-      doc.text(`${total}`, col.total + 10, y);
+      doc.text(`${total}`, col.total + 25, y);
 
-      // Row divider
-      doc
-        .moveTo(30, y + 15)
-        .lineTo(550, y + 15)
-        .strokeOpacity(0.2)
-        .stroke()
-        .strokeOpacity(1);
+      if (index !== entries.length - 1) {
+        doc
+          .moveTo(30, y + 15)
+          .lineTo(550, y + 15)
+          .strokeOpacity(0.2)
+          // .stroke()
+          .strokeOpacity(1);
+      }
 
       y += 20;
 
@@ -474,17 +380,17 @@ const exportMonthlyPDF = async (req, res) => {
       }
     });
 
-    // Final Total Row
     y += 10;
 
     doc.moveTo(30, y).lineTo(550, y).stroke();
 
-    y += 10;
+    y += 5;
 
-    doc.font("Helvetica-Bold").fontSize(13).fillColor("#0E9F6E");
+    doc.font("Helvetica-Bold").fontSize(13);
 
-    // Align EXACTLY under TOTAL column
-    doc.text(`Total Amount:${totalAmount}`, 350, y);
+    doc.text("Total", col.price + 20, y);
+    doc.text(String(totalCups), col.cups + 10, y);
+    doc.text(`${totalAmount}`, col.total + 25, y);
 
     doc.end();
   } catch (error) {
@@ -499,7 +405,5 @@ module.exports = {
   getMonthlyEntries,
   updateEntry,
   deleteEntry,
-  //   exportMonthlySummary
-  //   exportMonthlyEntries,
   exportMonthlyPDF,
 };

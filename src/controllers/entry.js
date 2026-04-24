@@ -308,6 +308,8 @@ const exportMonthlyPDF = async (req, res) => {
 
     doc.moveDown(2);
 
+    const pageHeight = doc.page.height;
+
     const tableTop = doc.y;
 
     const col = {
@@ -356,27 +358,50 @@ const exportMonthlyPDF = async (req, res) => {
       const price = e.price_per_cup || 0;
       const total = cups * price;
 
-      doc.text(String(index + 1), col.sr, y);
-      doc.text(formattedDate, col.date - 20, y);
-      doc.text(formattedTime, col.time - 5, y);
-      doc.text(`${price}`, col.price + 20, y);
-      doc.text(String(cups), col.cups + 10, y);
-      doc.text(`${total}`, col.total + 25, y);
+      // safer text rendering (no layout change, just prevents overflow)
+      doc.text(String(index + 1), col.sr, y, { width: 30 });
+      doc.text(formattedDate, col.date - 20, y, { width: 90 });
+      doc.text(formattedTime, col.time - 5, y, { width: 70 });
+      doc.text(`${price}`, col.price + 20, y, { width: 50 });
+      doc.text(String(cups), col.cups + 10, y, { width: 40 });
+      doc.text(`${total}`, col.total + 25, y, { width: 60 });
 
-      if (index !== entries.length - 1) {
+      // adaptive row height (minimal change)
+      const rowHeight = Math.max(
+        doc.heightOfString(formattedDate, { width: 90 }),
+        doc.heightOfString(formattedTime, { width: 70 }),
+        20,
+      );
+
+      y += rowHeight + 5;
+
+      // dynamic page break (instead of hardcoded 700)
+      if (y > pageHeight - 80) {
+        doc.addPage();
+        y = 50;
+
+        // redraw header on new page (safe fix)
+        doc.font("Helvetica-Bold").fillColor("#6B3F1D").fontSize(12);
+
+        doc.text("#", col.sr, y);
+        doc.text("DATE", col.date, y);
+        doc.text("TIME", col.time, y);
+        doc.text("PER CUP", col.price, y);
+        doc.text("CUPS", col.cups, y);
+        doc.text("TOTAL", col.total + 15, y);
+
         doc
           .moveTo(30, y + 15)
           .lineTo(550, y + 15)
-          .strokeOpacity(0.2)
-          // .stroke()
-          .strokeOpacity(1);
+          .stroke();
+
+        doc.font("Helvetica").fillColor("black");
+
+        y += 25;
       }
 
-      y += 20;
-
-      if (y > 700) {
-        doc.addPage();
-        y = 50;
+      if (index !== entries.length - 1) {
+        doc.moveTo(30, y).lineTo(550, y).strokeOpacity(0.2).strokeOpacity(1);
       }
     });
 
